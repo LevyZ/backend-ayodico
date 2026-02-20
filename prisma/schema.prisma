@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+model User {
+  id                String   @id @default(uuid())
+  email             String   @unique
+  password          String
+  role              UserRole @default(USER)
+  preferredRegionId String?
+  preferredCantonId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  preferredRegion Region? @relation("UserPreferredRegion", fields: [preferredRegionId], references: [id])
+  preferredCanton Canton? @relation("UserPreferredCanton", fields: [preferredCantonId], references: [id])
+
+  @@map("users")
+}
+
+model Region {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cantons Canton[] @relation("RegionCantons")
+  users   User[]   @relation("UserPreferredRegion")
+
+  @@map("regions")
+}
+
+model Canton {
+  id        String   @id @default(uuid())
+  name      String
+  code      String
+  regionId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  region Region @relation("RegionCantons", fields: [regionId], references: [id], onDelete: Cascade)
+  users  User[] @relation("UserPreferredCanton")
+
+  @@unique([regionId, code])
+  @@map("cantons")
+}
+
+model Tone {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  name          String
+  displaySymbol String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("tones")
+}

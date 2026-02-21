@@ -15,6 +15,24 @@ enum UserRole {
   SUPER_ADMIN
 }
 
+enum TranslationDirection {
+  FR_TO_BHETE
+  BHETE_TO_FR
+}
+
+enum TranslationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ContributionAction {
+  CREATED
+  UPDATED
+  APPROVED
+  REJECTED
+}
+
 model User {
   id                String   @id @default(uuid())
   email             String   @unique
@@ -25,8 +43,11 @@ model User {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  preferredRegion Region? @relation("UserPreferredRegion", fields: [preferredRegionId], references: [id])
-  preferredCanton Canton? @relation("UserPreferredCanton", fields: [preferredCantonId], references: [id])
+  preferredRegion         Region?              @relation("UserPreferredRegion", fields: [preferredRegionId], references: [id])
+  preferredCanton         Canton?              @relation("UserPreferredCanton", fields: [preferredCantonId], references: [id])
+  contributionsAsContributor Translation[]     @relation("TranslationContributor")
+  translationsApproved     Translation[]       @relation("TranslationApprovedBy")
+  contributionHistory      ContributionHistory[]
 
   @@map("users")
 }
@@ -38,8 +59,9 @@ model Region {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  cantons Canton[] @relation("RegionCantons")
-  users   User[]   @relation("UserPreferredRegion")
+  cantons     Canton[]      @relation("RegionCantons")
+  users       User[]        @relation("UserPreferredRegion")
+  translations Translation[]
 
   @@map("regions")
 }
@@ -52,8 +74,9 @@ model Canton {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  region Region @relation("RegionCantons", fields: [regionId], references: [id], onDelete: Cascade)
-  users  User[] @relation("UserPreferredCanton")
+  region       Region       @relation("RegionCantons", fields: [regionId], references: [id], onDelete: Cascade)
+  users        User[]       @relation("UserPreferredCanton")
+  translations Translation[]
 
   @@unique([regionId, code])
   @@map("cantons")
@@ -68,4 +91,42 @@ model Tone {
   updatedAt     DateTime @updatedAt
 
   @@map("tones")
+}
+
+model Translation {
+  id              String               @id @default(uuid())
+  frenchTerm      String
+  bheteTerm       String
+  toneNotation    String
+  direction       TranslationDirection
+  status          TranslationStatus    @default(PENDING)
+  contributorId   String?
+  regionId        String?
+  cantonId        String?
+  approvedById    String?
+  contextOrMeaning String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  contributor  User?    @relation("TranslationContributor", fields: [contributorId], references: [id], onDelete: SetNull)
+  region       Region?  @relation(fields: [regionId], references: [id], onDelete: SetNull)
+  canton       Canton?  @relation(fields: [cantonId], references: [id], onDelete: SetNull)
+  approvedBy   User?    @relation("TranslationApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  contributionHistory ContributionHistory[]
+
+  @@map("translations")
+}
+
+model ContributionHistory {
+  id            String           @id @default(uuid())
+  translationId String
+  userId        String
+  action        ContributionAction
+  notes         String?
+  createdAt     DateTime         @default(now())
+
+  translation Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("contribution_history")
 }

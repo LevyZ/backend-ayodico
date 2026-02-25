@@ -8,12 +8,20 @@ export class TranslationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(dto: ListTranslationsDto) {
-    const { direction, page = 1, limit = 20, regionId, cantonId } = dto;
+    const { direction, page = 1, limit = 20, regionId, cantonId, search } = dto;
     const where = {
       status: TranslationStatus.APPROVED,
       ...(direction ? { direction } : {}),
       ...(regionId ? { regionId } : {}),
       ...(cantonId ? { cantonId } : {}),
+      ...(search
+        ? {
+            OR: [
+              { frenchTerm: { contains: search, mode: 'insensitive' as const } },
+              { bheteTerm: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
     };
 
     const [rows, total] = await Promise.all([

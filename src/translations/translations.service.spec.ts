@@ -200,5 +200,79 @@ describe('TranslationsService', () => {
         }),
       );
     });
+
+    it('filters by search term using OR on frenchTerm and bheteTerm (case-insensitive)', async () => {
+      mockPrismaService.translation.findMany.mockResolvedValue([makeRow('9')]);
+      mockPrismaService.translation.count.mockResolvedValue(1);
+
+      await service.findAll({ search: 'BONJOUR' });
+
+      expect(mockPrismaService.translation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            status: TranslationStatus.APPROVED,
+            OR: [
+              { frenchTerm: { contains: 'BONJOUR', mode: 'insensitive' } },
+              { bheteTerm: { contains: 'BONJOUR', mode: 'insensitive' } },
+            ],
+          },
+        }),
+      );
+    });
+
+    it('combines search with direction filter', async () => {
+      mockPrismaService.translation.findMany.mockResolvedValue([makeRow('10')]);
+      mockPrismaService.translation.count.mockResolvedValue(1);
+
+      await service.findAll({ search: 'soleil', direction: TranslationDirection.FR_TO_BHETE });
+
+      expect(mockPrismaService.translation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            status: TranslationStatus.APPROVED,
+            direction: TranslationDirection.FR_TO_BHETE,
+            OR: [
+              { frenchTerm: { contains: 'soleil', mode: 'insensitive' } },
+              { bheteTerm: { contains: 'soleil', mode: 'insensitive' } },
+            ],
+          },
+        }),
+      );
+    });
+
+    it('combines search with regionId filter', async () => {
+      mockPrismaService.translation.findMany.mockResolvedValue([makeRow('12')]);
+      mockPrismaService.translation.count.mockResolvedValue(1);
+
+      await service.findAll({ search: 'soleil', regionId: 'region-uuid-1' });
+
+      expect(mockPrismaService.translation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            status: TranslationStatus.APPROVED,
+            regionId: 'region-uuid-1',
+            OR: [
+              { frenchTerm: { contains: 'soleil', mode: 'insensitive' } },
+              { bheteTerm: { contains: 'soleil', mode: 'insensitive' } },
+            ],
+          },
+        }),
+      );
+    });
+
+    it('does not add OR clause when search is empty string', async () => {
+      mockPrismaService.translation.findMany.mockResolvedValue([makeRow('11')]);
+      mockPrismaService.translation.count.mockResolvedValue(1);
+
+      await service.findAll({ search: '' });
+
+      expect(mockPrismaService.translation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: TranslationStatus.APPROVED },
+        }),
+      );
+      const callArg = mockPrismaService.translation.findMany.mock.calls[0][0] as { where: object };
+      expect(callArg.where).not.toHaveProperty('OR');
+    });
   });
 });

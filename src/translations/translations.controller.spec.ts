@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TranslationDirection } from '@prisma/client';
 import { TranslationsController } from './translations.controller';
@@ -5,6 +6,7 @@ import { TranslationsService } from './translations.service';
 
 const mockTranslationsService = {
   findAll: jest.fn(),
+  findOne: jest.fn(),
 };
 
 describe('TranslationsController', () => {
@@ -41,6 +43,24 @@ describe('TranslationsController', () => {
 
       expect(mockTranslationsService.findAll).toHaveBeenCalledWith({});
       expect(result).toBe(expected);
+    });
+  });
+
+  describe('findOne', () => {
+    it('delegates to service with id param', async () => {
+      const expected = { id: 'uuid-1', frenchTerm: 'soleil', bheteTerm: 'kpata', toneNotation: '2-3', direction: TranslationDirection.FR_TO_BHETE, contextOrMeaning: null, region: null, canton: null };
+      mockTranslationsService.findOne.mockResolvedValue(expected);
+
+      const result = await controller.findOne('uuid-1');
+
+      expect(mockTranslationsService.findOne).toHaveBeenCalledWith('uuid-1');
+      expect(result).toBe(expected);
+    });
+
+    it('propagates NotFoundException from service', async () => {
+      mockTranslationsService.findOne.mockRejectedValue(new NotFoundException());
+
+      await expect(controller.findOne('unknown')).rejects.toThrow(NotFoundException);
     });
   });
 });

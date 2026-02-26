@@ -190,4 +190,33 @@ describe('TranslationsController (e2e)', () => {
       expect(ids).not.toContain(tBhId);
     });
   });
+
+  describe('GET /translations/:id', () => {
+    it('returns 200 with full detail for existing APPROVED translation', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/translations/${tFrId}`)
+        .expect(HttpStatus.OK);
+
+      expect(res.body.id).toBe(tFrId);
+      expect(res.body).toHaveProperty('frenchTerm');
+      expect(res.body).toHaveProperty('bheteTerm');
+      expect(res.body).toHaveProperty('toneNotation');
+      expect(res.body).toHaveProperty('direction');
+      expect(res.body).toHaveProperty('contextOrMeaning');
+      expect(res.body).toHaveProperty('region');
+      expect(res.body).toHaveProperty('canton');
+    });
+
+    it('returns 404 for PENDING translation id', async () => {
+      await request(app.getHttpServer())
+        .get(`/translations/${tPendingId}`)
+        .expect(HttpStatus.NOT_FOUND);
+    });
+
+    it('returns 404 for unknown id', async () => {
+      await request(app.getHttpServer())
+        .get('/translations/00000000-0000-0000-0000-000000000000')
+        .expect(HttpStatus.NOT_FOUND);
+    });
+  });
 });

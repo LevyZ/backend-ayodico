@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { TranslationsService } from './translations.service';
 import { ListTranslationsDto } from './dto/list-translations.dto';
@@ -11,5 +11,10 @@ export class TranslationsController {
   @Get()
   findAll(@Query() query: ListTranslationsDto) {
     return this.translationsService.findAll(query);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.translationsService.findOne(id);
   }
 }

@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TranslationDirection, TranslationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,6 +8,7 @@ const mockPrismaService = {
   translation: {
     findMany: jest.fn(),
     count: jest.fn(),
+    findFirst: jest.fn(),
   },
 };
 
@@ -273,6 +275,52 @@ describe('TranslationsService', () => {
       );
       const callArg = mockPrismaService.translation.findMany.mock.calls[0][0] as { where: object };
       expect(callArg.where).not.toHaveProperty('OR');
+    });
+  });
+
+  describe('findOne', () => {
+    it('returns full translation detail when found (APPROVED)', async () => {
+      const row = {
+        ...makeRow('1'),
+        contextOrMeaning: 'Utilisé pour saluer',
+        region: { id: 'r1', name: 'Région A', code: 'RA', createdAt: new Date(), updatedAt: new Date() },
+        canton: { id: 'c1', name: 'Canton A', code: 'CA', regionId: 'r1', createdAt: new Date(), updatedAt: new Date() },
+      };
+      mockPrismaService.translation.findFirst.mockResolvedValue(row);
+
+      const result = await service.findOne('1');
+
+      expect(mockPrismaService.translation.findFirst).toHaveBeenCalledWith({
+        where: { id: '1', status: TranslationStatus.APPROVED },
+        include: { region: true, canton: true },
+      });
+      expect(result.id).toBe('1');
+      expect(result.contextOrMeaning).toBe('Utilisé pour saluer');
+      expect(result.region).toEqual({ id: 'r1', name: 'Région A', code: 'RA' });
+      expect(result.canton).toEqual({ id: 'c1', name: 'Canton A', code: 'CA' });
+    });
+
+    it('returns null for contextOrMeaning when absent', async () => {
+      mockPrismaService.translation.findFirst.mockResolvedValue(makeRow('2'));
+
+      const result = await service.findOne('2');
+
+      expect(result.contextOrMeaning).toBeNull();
+    });
+
+    it('returns null for region and canton when absent', async () => {
+      mockPrismaService.translation.findFirst.mockResolvedValue(makeRow('3'));
+
+      const result = await service.findOne('3');
+
+      expect(result.region).toBeNull();
+      expect(result.canton).toBeNull();
+    });
+
+    it('throws NotFoundException when translation not found', async () => {
+      mockPrismaService.translation.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne('unknown-id')).rejects.toThrow(NotFoundException);
     });
   });
 });

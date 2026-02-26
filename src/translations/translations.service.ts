@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { TranslationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ListTranslationsDto } from './dto/list-translations.dto';
@@ -52,6 +52,32 @@ export class TranslationsService {
       total,
       page,
       limit,
+    };
+  }
+
+  async findOne(id: string) {
+    const translation = await this.prisma.translation.findFirst({
+      where: { id, status: TranslationStatus.APPROVED },
+      include: { region: true, canton: true },
+    });
+
+    if (!translation) {
+      throw new NotFoundException('Traduction introuvable');
+    }
+
+    return {
+      id: translation.id,
+      frenchTerm: translation.frenchTerm,
+      bheteTerm: translation.bheteTerm,
+      toneNotation: translation.toneNotation,
+      direction: translation.direction,
+      contextOrMeaning: translation.contextOrMeaning,
+      region: translation.region
+        ? { id: translation.region.id, name: translation.region.name, code: translation.region.code }
+        : null,
+      canton: translation.canton
+        ? { id: translation.canton.id, name: translation.canton.name, code: translation.canton.code }
+        : null,
     };
   }
 }

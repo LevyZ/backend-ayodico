@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { TranslationStatus } from '@prisma/client';
+import { ContributionAction, TranslationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ListTranslationsDto } from './dto/list-translations.dto';
+import type { CreateContributionDto } from './dto/create-contribution.dto';
 
 @Injectable()
 export class TranslationsService {
@@ -52,6 +53,44 @@ export class TranslationsService {
       total,
       page,
       limit,
+    };
+  }
+
+  async create(userId: string, dto: CreateContributionDto) {
+    const { frenchTerm, bheteTerm, toneNotation, direction, contextOrMeaning } = dto;
+
+    const translation = await this.prisma.$transaction(async (tx) => {
+      const t = await tx.translation.create({
+        data: {
+          frenchTerm,
+          bheteTerm,
+          toneNotation,
+          direction,
+          contextOrMeaning: contextOrMeaning ?? null,
+          status: TranslationStatus.PENDING,
+          contributorId: userId,
+        },
+      });
+
+      await tx.contributionHistory.create({
+        data: {
+          translationId: t.id,
+          userId,
+          action: ContributionAction.CREATED,
+        },
+      });
+
+      return t;
+    });
+
+    return {
+      id: translation.id,
+      frenchTerm: translation.frenchTerm,
+      bheteTerm: translation.bheteTerm,
+      toneNotation: translation.toneNotation,
+      direction: translation.direction,
+      status: translation.status,
+      createdAt: translation.createdAt.toISOString(),
     };
   }
 

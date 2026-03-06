@@ -1,15 +1,21 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { TranslationDirection, TranslationStatus } from '@prisma/client';
+import { ContributionAction, TranslationDirection, TranslationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TranslationsService } from './translations.service';
+import type { CreateContributionDto } from './dto/create-contribution.dto';
 
 const mockPrismaService = {
   translation: {
     findMany: jest.fn(),
     count: jest.fn(),
     findFirst: jest.fn(),
+    create: jest.fn(),
   },
+  contributionHistory: {
+    create: jest.fn(),
+  },
+  $transaction: jest.fn(),
 };
 
 const makeRow = (
@@ -38,6 +44,10 @@ describe('TranslationsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrismaService.$transaction.mockImplementation(
+      async (fn: (tx: typeof mockPrismaService) => Promise<unknown>) =>
+        fn(mockPrismaService),
+    );
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TranslationsService,
@@ -321,6 +331,66 @@ describe('TranslationsService', () => {
       mockPrismaService.translation.findFirst.mockResolvedValue(null);
 
       await expect(service.findOne('unknown-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('create', () => {
+    it('creates translation (PENDING) and contribution history, returns DTO', async () => {
+      const now = new Date();
+      const createdTranslation = {
+        id: 'contrib-uuid-1',
+        frenchTerm: 'soleil',
+        bheteTerm: 'kpata',
+        toneNotation: 'high-low',
+        direction: TranslationDirection.FR_TO_BHETE,
+        status: TranslationStatus.PENDING,
+        contributorId: 'user-uuid-1',
+        contextOrMeaning: null,
+        regionId: null,
+        cantonId: null,
+        approvedById: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockPrismaService.translation.create.mockResolvedValue(createdTranslation);
+      mockPrismaService.contributionHistory.create.mockResolvedValue({});
+
+      const dto: CreateContributionDto = {
+        frenchTerm: 'soleil',
+        bheteTerm: 'kpata',
+        toneNotation: 'high-low',
+        direction: TranslationDirection.FR_TO_BHETE,
+      };
+      const result = await service.create('user-uuid-1', dto);
+
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      expect(mockPrismaService.translation.create).toHaveBeenCalledWith({
+        data: {
+          frenchTerm: 'soleil',
+          bheteTerm: 'kpata',
+          toneNotation: 'high-low',
+          direction: TranslationDirection.FR_TO_BHETE,
+          contextOrMeaning: null,
+          status: TranslationStatus.PENDING,
+          contributorId: 'user-uuid-1',
+        },
+      });
+      expect(mockPrismaService.contributionHistory.create).toHaveBeenCalledWith({
+        data: {
+          translationId: 'contrib-uuid-1',
+          userId: 'user-uuid-1',
+          action: ContributionAction.CREATED,
+        },
+      });
+      expect(result).toEqual({
+        id: 'contrib-uuid-1',
+        frenchTerm: 'soleil',
+        bheteTerm: 'kpata',
+        toneNotation: 'high-low',
+        direction: TranslationDirection.FR_TO_BHETE,
+        status: TranslationStatus.PENDING,
+        createdAt: now.toISOString(),
+      });
     });
   });
 });

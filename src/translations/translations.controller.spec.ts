@@ -3,10 +3,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TranslationDirection } from '@prisma/client';
 import { TranslationsController } from './translations.controller';
 import { TranslationsService } from './translations.service';
+import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
+import type { AuthenticatedRequest } from '../auth/guards/jwt-access.guard';
+import type { CreateContributionDto } from './dto/create-contribution.dto';
 
 const mockTranslationsService = {
   findAll: jest.fn(),
   findOne: jest.fn(),
+  create: jest.fn(),
 };
 
 describe('TranslationsController', () => {
@@ -19,7 +23,10 @@ describe('TranslationsController', () => {
       providers: [
         { provide: TranslationsService, useValue: mockTranslationsService },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAccessGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
     controller = module.get<TranslationsController>(TranslationsController);
   });
 
@@ -61,6 +68,36 @@ describe('TranslationsController', () => {
       mockTranslationsService.findOne.mockRejectedValue(new NotFoundException());
 
       await expect(controller.findOne('unknown')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('create', () => {
+    it('delegates to service with userId and dto, returns 201 payload', async () => {
+      const expected = {
+        id: 'contrib-uuid-1',
+        frenchTerm: 'soleil',
+        bheteTerm: 'kpata',
+        toneNotation: 'high-low',
+        direction: TranslationDirection.FR_TO_BHETE,
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
+      };
+      mockTranslationsService.create.mockResolvedValue(expected);
+
+      const dto: CreateContributionDto = {
+        frenchTerm: 'soleil',
+        bheteTerm: 'kpata',
+        toneNotation: 'high-low',
+        direction: TranslationDirection.FR_TO_BHETE,
+      };
+      const mockReq = {
+        user: { userId: 'user-uuid-1', role: 'USER' },
+      } as AuthenticatedRequest;
+
+      const result = await controller.create(dto, mockReq);
+
+      expect(mockTranslationsService.create).toHaveBeenCalledWith('user-uuid-1', dto);
+      expect(result).toBe(expected);
     });
   });
 });

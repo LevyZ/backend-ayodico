@@ -38,4 +38,12 @@ export class CreateContributionDto {
   @MaxLength(500)
   @Transform(trim)
   contextOrMeaning?: string;
+
+  @IsOptional()
+  @IsString()
+  regionId?: string;
+
+  @IsOptional()
+  @IsString()
+  cantonId?: string;
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ContributionAction, TranslationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ListTranslationsDto } from './dto/list-translations.dto';
@@ -57,7 +57,23 @@ export class TranslationsService {
   }
 
   async create(userId: string, dto: CreateContributionDto) {
-    const { frenchTerm, bheteTerm, toneNotation, direction, contextOrMeaning } = dto;
+    const { frenchTerm, bheteTerm, toneNotation, direction, contextOrMeaning, regionId, cantonId } = dto;
+
+    if (regionId) {
+      const region = await this.prisma.region.findUnique({ where: { id: regionId } });
+      if (!region) throw new NotFoundException('Région introuvable');
+    }
+
+    if (cantonId && !regionId) {
+      throw new BadRequestException('Un canton ne peut pas être spécifié sans une région');
+    }
+
+    if (cantonId) {
+      const canton = await this.prisma.canton.findUnique({ where: { id: cantonId } });
+      if (!canton) throw new NotFoundException('Canton introuvable');
+      if (canton.regionId !== regionId)
+        throw new BadRequestException('Le canton ne fait pas partie de la région indiquée');
+    }
 
     const translation = await this.prisma.$transaction(async (tx) => {
       const t = await tx.translation.create({
@@ -67,6 +83,8 @@ export class TranslationsService {
           toneNotation,
           direction,
           contextOrMeaning: contextOrMeaning ?? null,
+          regionId: regionId ?? null,
+          cantonId: cantonId ?? null,
           status: TranslationStatus.PENDING,
           contributorId: userId,
         },
@@ -90,6 +108,8 @@ export class TranslationsService {
       toneNotation: translation.toneNotation,
       direction: translation.direction,
       status: translation.status,
+      regionId: translation.regionId,
+      cantonId: translation.cantonId,
       createdAt: translation.createdAt.toISOString(),
     };
   }

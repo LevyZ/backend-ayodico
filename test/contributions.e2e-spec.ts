@@ -81,6 +81,8 @@ describe('TranslationsController (POST /translations) — Contributions (e2e)', 
       expect(body.direction).toBe(TranslationDirection.FR_TO_BHETE);
       expect(body.status).toBe('PENDING');
       expect(body).toHaveProperty('createdAt');
+      expect(body.regionId).toBeNull();
+      expect(body.cantonId).toBeNull();
     });
 
     it('returns 401 when no token provided', async () => {
@@ -96,6 +98,24 @@ describe('TranslationsController (POST /translations) — Contributions (e2e)', 
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ frenchTerm: 'soleil' })
         .expect(HttpStatus.BAD_REQUEST);
+    });
+
+    it('returns 404 when regionId does not exist', async () => {
+      await request(app.getHttpServer())
+        .post('/translations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...validBody, regionId: '00000000-0000-0000-0000-000000000000' })
+        .expect(HttpStatus.NOT_FOUND);
+    });
+
+    it('returns 404 when cantonId does not exist', async () => {
+      const region = await prisma.region.findFirst();
+      expect(region).not.toBeNull(); // fail explicitly if no regions seeded
+      await request(app.getHttpServer())
+        .post('/translations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...validBody, regionId: region!.id, cantonId: '00000000-0000-0000-0000-000000000000' })
+        .expect(HttpStatus.NOT_FOUND);
     });
   });
 });

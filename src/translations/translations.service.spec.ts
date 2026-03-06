@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ContributionAction, TranslationDirection, TranslationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -14,6 +14,12 @@ const mockPrismaService = {
   },
   contributionHistory: {
     create: jest.fn(),
+  },
+  region: {
+    findUnique: jest.fn(),
+  },
+  canton: {
+    findUnique: jest.fn(),
   },
   $transaction: jest.fn(),
 };
@@ -335,24 +341,25 @@ describe('TranslationsService', () => {
   });
 
   describe('create', () => {
+    const now = new Date();
+    const baseTranslation = {
+      id: 'contrib-uuid-1',
+      frenchTerm: 'soleil',
+      bheteTerm: 'kpata',
+      toneNotation: 'high-low',
+      direction: TranslationDirection.FR_TO_BHETE,
+      status: TranslationStatus.PENDING,
+      contributorId: 'user-uuid-1',
+      contextOrMeaning: null,
+      regionId: null,
+      cantonId: null,
+      approvedById: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
     it('creates translation (PENDING) and contribution history, returns DTO', async () => {
-      const now = new Date();
-      const createdTranslation = {
-        id: 'contrib-uuid-1',
-        frenchTerm: 'soleil',
-        bheteTerm: 'kpata',
-        toneNotation: 'high-low',
-        direction: TranslationDirection.FR_TO_BHETE,
-        status: TranslationStatus.PENDING,
-        contributorId: 'user-uuid-1',
-        contextOrMeaning: null,
-        regionId: null,
-        cantonId: null,
-        approvedById: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      mockPrismaService.translation.create.mockResolvedValue(createdTranslation);
+      mockPrismaService.translation.create.mockResolvedValue(baseTranslation);
       mockPrismaService.contributionHistory.create.mockResolvedValue({});
 
       const dto: CreateContributionDto = {
@@ -371,6 +378,8 @@ describe('TranslationsService', () => {
           toneNotation: 'high-low',
           direction: TranslationDirection.FR_TO_BHETE,
           contextOrMeaning: null,
+          regionId: null,
+          cantonId: null,
           status: TranslationStatus.PENDING,
           contributorId: 'user-uuid-1',
         },
@@ -389,8 +398,103 @@ describe('TranslationsService', () => {
         toneNotation: 'high-low',
         direction: TranslationDirection.FR_TO_BHETE,
         status: TranslationStatus.PENDING,
+        regionId: null,
+        cantonId: null,
         createdAt: now.toISOString(),
       });
+    });
+
+    it('creates with valid regionId and cantonId, returns them in DTO', async () => {
+      mockPrismaService.region.findUnique.mockResolvedValue({ id: 'region-1', name: 'Centre', code: 'CE' });
+      mockPrismaService.canton.findUnique.mockResolvedValue({ id: 'canton-1', name: 'Gagnoa', code: 'GA', regionId: 'region-1' });
+      const translationWithGeo = { ...baseTranslation, regionId: 'region-1', cantonId: 'canton-1' };
+      mockPrismaService.translation.create.mockResolvedValue(translationWithGeo);
+      mockPrismaService.contributionHistory.create.mockResolvedValue({});
+
+      const dto: CreateContributionDto = {
+        frenchTerm: 'soleil',
+        bheteTerm: 'kpata',
+        toneNotation: 'high-low',
+        direction: TranslationDirection.FR_TO_BHETE,
+        regionId: 'region-1',
+        cantonId: 'canton-1',
+      };
+      const result = await service.create('user-uuid-1', dto);
+
+      expect(mockPrismaService.region.findUnique).toHaveBeenCalledWith({ where: { id: 'region-1' } });
+      expect(mockPrismaService.canton.findUnique).toHaveBeenCalledWith({ where: { id: 'canton-1' } });
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      expect(mockPrismaService.translation.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          regionId: 'region-1',
+          cantonId: 'canton-1',
+        }),
+      });
+      expect(result.regionId).toBe('region-1');
+      expect(result.cantonId).toBe('canton-1');
+    });
+
+    it('throws BadRequestException when cantonId provided without regionId', async () => {
+      const dto: CreateContributionDto = {
+        frenchTerm: 'soleil',
+        bheteTerm: 'kpata',
+        toneNotation: 'high-low',
+        direction: TranslationDirection.FR_TO_BHETE,
+        cantonId: 'canton-1',
+      };
+
+      await expect(service.create('user-uuid-1', dto)).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.region.findUnique).not.toHaveBeenCalled();
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when regionId does not exist', async () => {
+      mockPrismaService.region.findUnique.mockResolvedValue(null);
+
+      const dto: CreateContributionDto = {
+        frenchTerm: 'soleil',
+        bheteTerm: 'kpata',
+        toneNotation: 'high-low',
+        direction: TranslationDirection.FR_TO_BHETE,
+        regionId: 'unknown-region',
+      };
+
+      await expect(service.create('user-uuid-1', dto)).rejects.toThrow(NotFoundException);
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when cantonId does not exist', async () => {
+      mockPrismaService.region.findUnique.mockResolvedValue({ id: 'region-1' });
+      mockPrismaService.canton.findUnique.mockResolvedValue(null);
+
+      const dto: CreateContributionDto = {
+        frenchTerm: 'soleil',
+        bheteTerm: 'kpata',
+        toneNotation: 'high-low',
+        direction: TranslationDirection.FR_TO_BHETE,
+        regionId: 'region-1',
+        cantonId: 'unknown-canton',
+      };
+
+      await expect(service.create('user-uuid-1', dto)).rejects.toThrow(NotFoundException);
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when canton does not belong to region', async () => {
+      mockPrismaService.region.findUnique.mockResolvedValue({ id: 'region-1' });
+      mockPrismaService.canton.findUnique.mockResolvedValue({ id: 'canton-1', regionId: 'other-region' });
+
+      const dto: CreateContributionDto = {
+        frenchTerm: 'soleil',
+        bheteTerm: 'kpata',
+        toneNotation: 'high-low',
+        direction: TranslationDirection.FR_TO_BHETE,
+        regionId: 'region-1',
+        cantonId: 'canton-1',
+      };
+
+      await expect(service.create('user-uuid-1', dto)).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
     });
   });
 });

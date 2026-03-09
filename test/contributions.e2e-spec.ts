@@ -118,4 +118,33 @@ describe('TranslationsController (POST /translations) — Contributions (e2e)', 
         .expect(HttpStatus.NOT_FOUND);
     });
   });
+
+  describe('GET /translations/mine', () => {
+    it('returns 200 with array of user contributions (authenticated)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/translations/mine')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(HttpStatus.OK);
+
+      const body = res.body as unknown[];
+      expect(Array.isArray(body)).toBe(true);
+      expect(body.length).toBeGreaterThanOrEqual(1);
+      const first = body[0] as Record<string, unknown>;
+      expect(first).toHaveProperty('id');
+      expect(first).toHaveProperty('frenchTerm');
+      expect(first).toHaveProperty('bheteTerm');
+      expect(first).toHaveProperty('toneNotation');
+      expect(first).toHaveProperty('direction');
+      expect(first).toHaveProperty('status');
+      expect(first).toHaveProperty('regionId');
+      expect(first).toHaveProperty('cantonId');
+      expect(first).toHaveProperty('createdAt');
+    });
+
+    it('returns 401 when no token provided', async () => {
+      await request(app.getHttpServer())
+        .get('/translations/mine')
+        .expect(HttpStatus.UNAUTHORIZED);
+    });
+  });
 });

@@ -11,6 +11,7 @@ const mockTranslationsService = {
   findAll: jest.fn(),
   findOne: jest.fn(),
   create: jest.fn(),
+  findMine: jest.fn(),
 };
 
 describe('TranslationsController', () => {
@@ -68,6 +69,19 @@ describe('TranslationsController', () => {
       mockTranslationsService.findOne.mockRejectedValue(new NotFoundException());
 
       await expect(controller.findOne('unknown')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findMine', () => {
+    it('delegates to service with userId from req.user', async () => {
+      const expected = [{ id: 'c1', frenchTerm: 'soleil', status: 'PENDING' }];
+      mockTranslationsService.findMine.mockResolvedValue(expected);
+
+      const mockReq = { user: { userId: 'user-uuid-1', role: 'USER' } } as AuthenticatedRequest;
+      const result = await controller.findMine(mockReq);
+
+      expect(mockTranslationsService.findMine).toHaveBeenCalledWith('user-uuid-1');
+      expect(result).toBe(expected);
     });
   });
 

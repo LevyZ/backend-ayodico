@@ -37,6 +37,7 @@ coverage/
 # IDE and editor files
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 

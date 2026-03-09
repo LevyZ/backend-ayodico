@@ -27,6 +27,12 @@ export class TranslationsController {
     return this.translationsService.findAll(query);
   }
 
+  @Get('mine')
+  @UseGuards(JwtAccessGuard)
+  findMine(@Req() req: AuthenticatedRequest) {
+    return this.translationsService.findMine(req.user!.userId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.translationsService.findOne(id);

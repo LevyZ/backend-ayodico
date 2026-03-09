@@ -114,6 +114,25 @@ export class TranslationsService {
     };
   }
 
+  async findMine(userId: string) {
+    const translations = await this.prisma.translation.findMany({
+      where: { contributorId: userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return translations.map((t) => ({
+      id: t.id,
+      frenchTerm: t.frenchTerm,
+      bheteTerm: t.bheteTerm,
+      toneNotation: t.toneNotation,
+      direction: t.direction,
+      status: t.status,
+      regionId: t.regionId,
+      cantonId: t.cantonId,
+      createdAt: t.createdAt.toISOString(),
+    }));
+  }
+
   async findOne(id: string) {
     const translation = await this.prisma.translation.findFirst({
       where: { id, status: TranslationStatus.APPROVED },

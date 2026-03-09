@@ -340,6 +340,52 @@ describe('TranslationsService', () => {
     });
   });
 
+  describe('findMine', () => {
+    it('returns contributions for userId ordered by createdAt desc', async () => {
+      const rows = [
+        { ...makeRow('c1'), status: TranslationStatus.PENDING, contributorId: 'user-1' },
+        { ...makeRow('c2'), status: TranslationStatus.APPROVED, contributorId: 'user-1' },
+      ];
+      mockPrismaService.translation.findMany.mockResolvedValue(rows);
+
+      const result = await service.findMine('user-1');
+
+      expect(mockPrismaService.translation.findMany).toHaveBeenCalledWith({
+        where: { contributorId: 'user-1' },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('c1');
+      expect(result[0].status).toBe(TranslationStatus.PENDING);
+      expect(result[0].createdAt).toBe(rows[0].createdAt.toISOString());
+    });
+
+    it('returns empty array when no contributions', async () => {
+      mockPrismaService.translation.findMany.mockResolvedValue([]);
+      const result = await service.findMine('user-no-contrib');
+      expect(result).toEqual([]);
+    });
+
+    it('maps all required fields in the returned DTO', async () => {
+      const row = { ...makeRow('c3'), status: TranslationStatus.REJECTED, contributorId: 'user-2', regionId: 'r1', cantonId: 'c1' };
+      mockPrismaService.translation.findMany.mockResolvedValue([row]);
+
+      const result = await service.findMine('user-2');
+
+      expect(result[0]).toEqual({
+        id: 'c3',
+        frenchTerm: 'french_c3',
+        bheteTerm: 'bhete_c3',
+        toneNotation: '1-2',
+        direction: TranslationDirection.FR_TO_BHETE,
+        status: TranslationStatus.REJECTED,
+        regionId: 'r1',
+        cantonId: 'c1',
+        createdAt: row.createdAt.toISOString(),
+      });
+    });
+  });
+
   describe('create', () => {
     const now = new Date();
     const baseTranslation = {

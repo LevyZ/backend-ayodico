@@ -128,7 +128,7 @@ describe('TranslationsController', () => {
 
       const result = await controller.findPending();
 
-      expect(mockTranslationsService.findPending).toHaveBeenCalled();
+      expect(mockTranslationsService.findPending).toHaveBeenCalledWith();
       expect(result).toBe(expected);
     });
   });

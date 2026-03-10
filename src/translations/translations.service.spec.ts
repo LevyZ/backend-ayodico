@@ -582,6 +582,11 @@ describe('TranslationsService', () => {
     it('returns empty array when no pending contributions', async () => {
       mockPrismaService.translation.findMany.mockResolvedValue([]);
       const result = await service.findPending();
+      expect(mockPrismaService.translation.findMany).toHaveBeenCalledWith({
+        where: { status: TranslationStatus.PENDING },
+        include: { contributor: true, region: true, canton: true },
+        orderBy: { createdAt: 'asc' },
+      });
       expect(result).toEqual([]);
     });
 
@@ -596,6 +601,11 @@ describe('TranslationsService', () => {
       };
       mockPrismaService.translation.findMany.mockResolvedValue([row]);
       const result = await service.findPending();
+      expect(mockPrismaService.translation.findMany).toHaveBeenCalledWith({
+        where: { status: TranslationStatus.PENDING },
+        include: { contributor: true, region: true, canton: true },
+        orderBy: { createdAt: 'asc' },
+      });
       expect(result[0].contextOrMeaning).toBe('Utilisé au marché');
     });
   });

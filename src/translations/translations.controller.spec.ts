@@ -6,12 +6,14 @@ import { TranslationsService } from './translations.service';
 import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import type { AuthenticatedRequest } from '../auth/guards/jwt-access.guard';
 import type { CreateContributionDto } from './dto/create-contribution.dto';
+import type { UpdateContributionDto } from './dto/update-contribution.dto';
 
 const mockTranslationsService = {
   findAll: jest.fn(),
   findOne: jest.fn(),
   create: jest.fn(),
   findMine: jest.fn(),
+  requestUpdate: jest.fn(),
 };
 
 describe('TranslationsController', () => {
@@ -111,6 +113,21 @@ describe('TranslationsController', () => {
       const result = await controller.create(dto, mockReq);
 
       expect(mockTranslationsService.create).toHaveBeenCalledWith('user-uuid-1', dto);
+      expect(result).toBe(expected);
+    });
+  });
+
+  describe('requestUpdate', () => {
+    it('delegates to service with userId, id, and dto', async () => {
+      const expected = { id: 't1', status: 'PENDING' };
+      mockTranslationsService.requestUpdate.mockResolvedValue(expected);
+
+      const dto: UpdateContributionDto = { frenchTerm: 'nouveau' };
+      const mockReq = { user: { userId: 'user-uuid-1', role: 'USER' } } as AuthenticatedRequest;
+
+      const result = await controller.requestUpdate('t1', dto, mockReq);
+
+      expect(mockTranslationsService.requestUpdate).toHaveBeenCalledWith('user-uuid-1', 't1', dto);
       expect(result).toBe(expected);
     });
   });

@@ -3,6 +3,7 @@ import { ContributionAction, TranslationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ListTranslationsDto } from './dto/list-translations.dto';
 import type { CreateContributionDto } from './dto/create-contribution.dto';
+import type { UpdateContributionDto } from './dto/update-contribution.dto';
 
 @Injectable()
 export class TranslationsService {
@@ -131,6 +132,62 @@ export class TranslationsService {
       cantonId: t.cantonId,
       createdAt: t.createdAt.toISOString(),
     }));
+  }
+
+  async requestUpdate(userId: string, id: string, dto: UpdateContributionDto) {
+    const existing = await this.prisma.translation.findFirst({
+      where: { id, contributorId: userId, status: TranslationStatus.APPROVED },
+    });
+    if (!existing) throw new NotFoundException('Traduction introuvable ou non modifiable');
+
+    const finalRegionId = dto.regionId !== undefined ? dto.regionId || null : existing.regionId;
+    const finalCantonId = dto.cantonId !== undefined ? dto.cantonId || null : existing.cantonId;
+
+    if (finalRegionId) {
+      const region = await this.prisma.region.findUnique({ where: { id: finalRegionId } });
+      if (!region) throw new NotFoundException('Région introuvable');
+    }
+    if (finalCantonId && !finalRegionId) {
+      throw new BadRequestException('Un canton ne peut pas être spécifié sans une région');
+    }
+    if (finalCantonId) {
+      const canton = await this.prisma.canton.findUnique({ where: { id: finalCantonId } });
+      if (!canton) throw new NotFoundException('Canton introuvable');
+      if (canton.regionId !== finalRegionId)
+        throw new BadRequestException('Le canton ne fait pas partie de la région indiquée');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const t = await tx.translation.update({
+        where: { id },
+        data: {
+          ...(dto.frenchTerm !== undefined && { frenchTerm: dto.frenchTerm }),
+          ...(dto.bheteTerm !== undefined && { bheteTerm: dto.bheteTerm }),
+          ...(dto.toneNotation !== undefined && { toneNotation: dto.toneNotation }),
+          ...(dto.direction !== undefined && { direction: dto.direction }),
+          ...(dto.contextOrMeaning !== undefined && { contextOrMeaning: dto.contextOrMeaning }),
+          regionId: finalRegionId,
+          cantonId: finalCantonId,
+          status: TranslationStatus.PENDING,
+        },
+      });
+      await tx.contributionHistory.create({
+        data: { translationId: id, userId, action: ContributionAction.UPDATED },
+      });
+      return t;
+    });
+
+    return {
+      id: updated.id,
+      frenchTerm: updated.frenchTerm,
+      bheteTerm: updated.bheteTerm,
+      toneNotation: updated.toneNotation,
+      direction: updated.direction,
+      status: updated.status,
+      regionId: updated.regionId,
+      cantonId: updated.cantonId,
+      createdAt: updated.createdAt.toISOString(),
+    };
   }
 
   async findOne(id: string) {

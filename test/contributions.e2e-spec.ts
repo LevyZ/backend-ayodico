@@ -147,4 +147,32 @@ describe('TranslationsController (POST /translations) — Contributions (e2e)', 
         .expect(HttpStatus.UNAUTHORIZED);
     });
   });
+
+  describe('PATCH /translations/:id', () => {
+    let createdId: string;
+
+    beforeAll(async () => {
+      const res = await request(app.getHttpServer())
+        .get('/translations/mine')
+        .set('Authorization', `Bearer ${accessToken}`);
+      const body = res.body as Array<{ id: string; status: string }>;
+      const contrib = body[0];
+      if (contrib) createdId = contrib.id;
+    });
+
+    it('returns 404 for unknown id (PENDING status is not APPROVED)', async () => {
+      await request(app.getHttpServer())
+        .patch('/translations/00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ frenchTerm: 'test' })
+        .expect(HttpStatus.NOT_FOUND);
+    });
+
+    it('returns 401 without token', async () => {
+      await request(app.getHttpServer())
+        .patch(`/translations/${createdId ?? '00000000-0000-0000-0000-000000000000'}`)
+        .send({ frenchTerm: 'test' })
+        .expect(HttpStatus.UNAUTHORIZED);
+    });
+  });
 });

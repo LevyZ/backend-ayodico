@@ -4,6 +4,7 @@ import { ContributionAction, TranslationDirection, TranslationStatus } from '@pr
 import { PrismaService } from '../prisma/prisma.service';
 import { TranslationsService } from './translations.service';
 import type { CreateContributionDto } from './dto/create-contribution.dto';
+import type { UpdateContributionDto } from './dto/update-contribution.dto';
 
 const mockPrismaService = {
   translation: {
@@ -11,6 +12,7 @@ const mockPrismaService = {
     count: jest.fn(),
     findFirst: jest.fn(),
     create: jest.fn(),
+    update: jest.fn(),
   },
   contributionHistory: {
     create: jest.fn(),
@@ -541,6 +543,86 @@ describe('TranslationsService', () => {
 
       await expect(service.create('user-uuid-1', dto)).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('requestUpdate', () => {
+    const approvedTranslation = {
+      ...makeRow('t1'),
+      status: TranslationStatus.APPROVED,
+      contributorId: 'user-1',
+    };
+
+    it('updates fields and sets status to PENDING, adds UPDATED history', async () => {
+      mockPrismaService.translation.findFirst.mockResolvedValue(approvedTranslation);
+      const updatedT = { ...approvedTranslation, frenchTerm: 'nouveau', status: TranslationStatus.PENDING };
+      mockPrismaService.translation.update.mockResolvedValue(updatedT);
+      mockPrismaService.contributionHistory.create.mockResolvedValue({});
+
+      const dto: UpdateContributionDto = { frenchTerm: 'nouveau' };
+      const result = await service.requestUpdate('user-1', 't1', dto);
+
+      expect(mockPrismaService.translation.findFirst).toHaveBeenCalledWith({
+        where: { id: 't1', contributorId: 'user-1', status: TranslationStatus.APPROVED },
+      });
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      expect(mockPrismaService.translation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 't1' },
+          data: expect.objectContaining({
+            frenchTerm: 'nouveau',
+            status: TranslationStatus.PENDING,
+          }),
+        }),
+      );
+      expect(mockPrismaService.contributionHistory.create).toHaveBeenCalledWith({
+        data: { translationId: 't1', userId: 'user-1', action: ContributionAction.UPDATED },
+      });
+      expect(result.status).toBe(TranslationStatus.PENDING);
+    });
+
+    it('throws NotFoundException when translation not found or not owned or not APPROVED', async () => {
+      mockPrismaService.translation.findFirst.mockResolvedValue(null);
+      await expect(service.requestUpdate('user-1', 'x', {})).rejects.toThrow(NotFoundException);
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('preserves existing fields when not in DTO (partial update)', async () => {
+      mockPrismaService.translation.findFirst.mockResolvedValue(approvedTranslation);
+      const updatedT = { ...approvedTranslation, status: TranslationStatus.PENDING };
+      mockPrismaService.translation.update.mockResolvedValue(updatedT);
+      mockPrismaService.contributionHistory.create.mockResolvedValue({});
+
+      await service.requestUpdate('user-1', 't1', {}); // empty DTO
+
+      expect(mockPrismaService.translation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: TranslationStatus.PENDING,
+            regionId: approvedTranslation.regionId,
+            cantonId: approvedTranslation.cantonId,
+          }),
+        }),
+      );
+      const callArg = mockPrismaService.translation.update.mock.calls[0][0] as { data: Record<string, unknown> };
+      expect(callArg.data).not.toHaveProperty('frenchTerm');
+    });
+
+    it('returns DTO with updated fields and status PENDING', async () => {
+      mockPrismaService.translation.findFirst.mockResolvedValue(approvedTranslation);
+      const updatedT = {
+        ...approvedTranslation,
+        frenchTerm: 'soleil modifié',
+        status: TranslationStatus.PENDING,
+      };
+      mockPrismaService.translation.update.mockResolvedValue(updatedT);
+      mockPrismaService.contributionHistory.create.mockResolvedValue({});
+
+      const result = await service.requestUpdate('user-1', 't1', { frenchTerm: 'soleil modifié' });
+
+      expect(result.frenchTerm).toBe('soleil modifié');
+      expect(result.status).toBe(TranslationStatus.PENDING);
+      expect(result.createdAt).toBe(updatedT.createdAt.toISOString());
     });
   });
 });

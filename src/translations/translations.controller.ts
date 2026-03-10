@@ -18,6 +18,9 @@ import { CreateContributionDto } from './dto/create-contribution.dto';
 import { UpdateContributionDto } from './dto/update-contribution.dto';
 import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import type { AuthenticatedRequest } from '../auth/guards/jwt-access.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
 
 @SkipThrottle()
 @Controller('translations')
@@ -33,6 +36,13 @@ export class TranslationsController {
   @UseGuards(JwtAccessGuard)
   findMine(@Req() req: AuthenticatedRequest) {
     return this.translationsService.findMine(req.user!.userId);
+  }
+
+  @Get('pending')
+  @UseGuards(JwtAccessGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  findPending() {
+    return this.translationsService.findPending();
   }
 
   @Get(':id')

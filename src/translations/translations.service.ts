@@ -190,6 +190,35 @@ export class TranslationsService {
     };
   }
 
+  async findPending() {
+    const translations = await this.prisma.translation.findMany({
+      where: { status: TranslationStatus.PENDING },
+      include: { contributor: true, region: true, canton: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return translations.map((t) => ({
+      id: t.id,
+      frenchTerm: t.frenchTerm,
+      bheteTerm: t.bheteTerm,
+      toneNotation: t.toneNotation,
+      direction: t.direction,
+      contextOrMeaning: t.contextOrMeaning,
+      regionId: t.regionId,
+      cantonId: t.cantonId,
+      createdAt: t.createdAt.toISOString(),
+      contributor: t.contributor
+        ? { id: t.contributor.id, email: t.contributor.email }
+        : null,
+      region: t.region
+        ? { id: t.region.id, name: t.region.name, code: t.region.code }
+        : null,
+      canton: t.canton
+        ? { id: t.canton.id, name: t.canton.name, code: t.canton.code }
+        : null,
+    }));
+  }
+
   async findOne(id: string) {
     const translation = await this.prisma.translation.findFirst({
       where: { id, status: TranslationStatus.APPROVED },

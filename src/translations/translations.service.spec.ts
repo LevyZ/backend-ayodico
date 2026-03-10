@@ -546,6 +546,60 @@ describe('TranslationsService', () => {
     });
   });
 
+  describe('findPending', () => {
+    it('returns pending contributions with contributor/region/canton mapped', async () => {
+      const row = {
+        ...makeRow('p1'),
+        status: TranslationStatus.PENDING,
+        contributor: {
+          id: 'u1',
+          email: 'user@test.com',
+          password: 'x',
+          role: 'USER',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          preferredRegionId: null,
+          preferredCantonId: null,
+        },
+        region: { id: 'r1', name: 'Centre', code: 'CE', createdAt: new Date(), updatedAt: new Date() },
+        canton: null,
+      };
+      mockPrismaService.translation.findMany.mockResolvedValue([row]);
+
+      const result = await service.findPending();
+
+      expect(mockPrismaService.translation.findMany).toHaveBeenCalledWith({
+        where: { status: TranslationStatus.PENDING },
+        include: { contributor: true, region: true, canton: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].contributor).toEqual({ id: 'u1', email: 'user@test.com' });
+      expect(result[0].region).toEqual({ id: 'r1', name: 'Centre', code: 'CE' });
+      expect(result[0].canton).toBeNull();
+    });
+
+    it('returns empty array when no pending contributions', async () => {
+      mockPrismaService.translation.findMany.mockResolvedValue([]);
+      const result = await service.findPending();
+      expect(result).toEqual([]);
+    });
+
+    it('maps contextOrMeaning correctly', async () => {
+      const row = {
+        ...makeRow('p2'),
+        status: TranslationStatus.PENDING,
+        contextOrMeaning: 'Utilisé au marché',
+        contributor: null,
+        region: null,
+        canton: null,
+      };
+      mockPrismaService.translation.findMany.mockResolvedValue([row]);
+      const result = await service.findPending();
+      expect(result[0].contextOrMeaning).toBe('Utilisé au marché');
+    });
+  });
+
   describe('requestUpdate', () => {
     const approvedTranslation = {
       ...makeRow('t1'),

@@ -5,6 +5,7 @@ import { TranslationsController } from './translations.controller';
 import { TranslationsService } from './translations.service';
 import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import type { AuthenticatedRequest } from '../auth/guards/jwt-access.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { CreateContributionDto } from './dto/create-contribution.dto';
 import type { UpdateContributionDto } from './dto/update-contribution.dto';
 
@@ -14,6 +15,7 @@ const mockTranslationsService = {
   create: jest.fn(),
   findMine: jest.fn(),
   requestUpdate: jest.fn(),
+  findPending: jest.fn(),
 };
 
 describe('TranslationsController', () => {
@@ -28,6 +30,8 @@ describe('TranslationsController', () => {
       ],
     })
       .overrideGuard(JwtAccessGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(RolesGuard)
       .useValue({ canActivate: () => true })
       .compile();
     controller = module.get<TranslationsController>(TranslationsController);
@@ -113,6 +117,18 @@ describe('TranslationsController', () => {
       const result = await controller.create(dto, mockReq);
 
       expect(mockTranslationsService.create).toHaveBeenCalledWith('user-uuid-1', dto);
+      expect(result).toBe(expected);
+    });
+  });
+
+  describe('findPending', () => {
+    it('delegates to service and returns the result', async () => {
+      const expected = [{ id: 'p1', frenchTerm: 'soleil', bheteTerm: 'kpata', contributor: null }];
+      mockTranslationsService.findPending.mockResolvedValue(expected);
+
+      const result = await controller.findPending();
+
+      expect(mockTranslationsService.findPending).toHaveBeenCalled();
       expect(result).toBe(expected);
     });
   });

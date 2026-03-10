@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { TranslationDirection } from '@prisma/client';
 
@@ -8,18 +8,21 @@ const trim = ({ value }: { value: unknown }) =>
 export class UpdateContributionDto {
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(200)
   @Transform(trim)
   frenchTerm?: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(200)
   @Transform(trim)
   bheteTerm?: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
   @Transform(trim)
   toneNotation?: string;

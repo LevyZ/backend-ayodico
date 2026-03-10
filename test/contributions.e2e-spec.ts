@@ -160,7 +160,7 @@ describe('TranslationsController (POST /translations) — Contributions (e2e)', 
       if (contrib) createdId = contrib.id;
     });
 
-    it('returns 404 for unknown id (PENDING status is not APPROVED)', async () => {
+    it('returns 404 for unknown id', async () => {
       await request(app.getHttpServer())
         .patch('/translations/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${accessToken}`)

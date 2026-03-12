@@ -2,6 +2,7 @@ services:
   - type: web
     name: ayodico-backend
     runtime: node
+    plan: free
     buildCommand: npm ci && npm run build
     startCommand: npx prisma migrate deploy && npm run start:prod
     envVars:
